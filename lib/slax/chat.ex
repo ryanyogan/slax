@@ -24,4 +24,22 @@ defmodule Slax.Chat do
   def list_rooms do
     Repo.all(from r in Room, order_by: [asc: :name])
   end
+
+  @doc """
+  Creates a room with the given attributes.
+  """
+  def create_room(attrs) do
+    %Room{}
+    |> Room.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates the room with the given `room` struct and attributes.
+  """
+  def update_room(%Room{} = room, attrs) do
+    room
+    |> Room.changeset(attrs)
+    |> Repo.update()
+  end
 end
