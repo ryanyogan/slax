@@ -19,6 +19,7 @@ defmodule SlaxWeb.Router do
 
     live "/", ChatRoomLive
     live "/rooms/:id", ChatRoomLive
+    live "/rooms/:id/edit", ChatRoomLive.Edit
   end
 
   if Application.compile_env(:slax, :dev_routes) do

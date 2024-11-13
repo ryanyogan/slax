@@ -42,4 +42,11 @@ defmodule Slax.Chat do
     |> Room.changeset(attrs)
     |> Repo.update()
   end
+
+  @doc """
+  Changes the room with the given `room` struct and attributes.
+  """
+  def change_room(room, attrs \\ %{}) do
+    Room.changeset(room, attrs)
+  end
 end
