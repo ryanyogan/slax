@@ -3,6 +3,8 @@ defmodule SlaxWeb.ChatRoomLive do
   alias Slax.Chat
   alias Slax.Chat.{Room, Message}
   alias Slax.Accounts.User
+  alias Slax.Accounts
+  alias SlaxWeb.OnlineUsers
 
   @impl true
   def render(assigns) do
@@ -19,6 +21,20 @@ defmodule SlaxWeb.ChatRoomLive do
         </div>
         <div id="rooms-list">
           <.room_link :for={room <- @rooms} room={room} active={room.id == @room.id} />
+        </div>
+        <div class="mt-4">
+          <div class="flex items-center h-8 px-3 group">
+            <div class="flex items-center flex-grow focus:outline-none">
+              <span class="ml-2 leading-none font-medium text-sm">Users</span>
+            </div>
+          </div>
+          <div id="users-list">
+            <.user
+              :for={user <- @users}
+              user={user}
+              online={OnlineUsers.online?(@online_users, user.id)}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -127,6 +143,24 @@ defmodule SlaxWeb.ChatRoomLive do
     """
   end
 
+  attr :user, User, required: true
+  attr :online, :boolean, default: false
+
+  def user(assigns) do
+    ~H"""
+    <.link class="flex items-center h-8 hover:bg-gray-300 text-sm pl-8 pr-3" href="#">
+      <div class="flex justify-center w-4">
+        <%= if @online do %>
+          <span class="size-2 rounded-full bg-blue-500"></span>
+        <% else %>
+          <span class="size-2 rounded-full border-2 border-gray-500"></span>
+        <% end %>
+      </div>
+      <span class="ml-2 leading-none"><%= username(@user) %></span>
+    </.link>
+    """
+  end
+
   attr :active, :boolean, required: true
   attr :room, Room, required: true
 
@@ -195,9 +229,21 @@ defmodule SlaxWeb.ChatRoomLive do
   @impl true
   def mount(_params, _session, socket) do
     rooms = Chat.list_rooms()
+    users = Accounts.list_users()
     timezone = get_connect_params(socket)["timezone"]
 
-    {:ok, assign(socket, rooms: rooms, timezone: timezone)}
+    if connected?(socket) do
+      OnlineUsers.track(self(), socket.assigns.current_user)
+    end
+
+    OnlineUsers.subscribe()
+
+    socket =
+      socket
+      |> assign(rooms: rooms, timezone: timezone, users: users)
+      |> assign(online_users: OnlineUsers.list())
+
+    {:ok, socket}
   end
 
   @impl true
@@ -282,5 +328,12 @@ defmodule SlaxWeb.ChatRoomLive do
   @impl true
   def handle_info({:message_deleted, message}, socket) do
     {:noreply, stream_delete(socket, :messages, message)}
+  end
+
+  @impl true
+  def handle_info(%{event: "presence_diff", payload: diff}, socket) do
+    online_users = OnlineUsers.update(socket.assigns.online_users, diff)
+
+    {:noreply, assign(socket, :online_users, online_users)}
   end
 end
