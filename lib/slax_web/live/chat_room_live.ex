@@ -85,8 +85,8 @@ defmodule SlaxWeb.ChatRoomLive do
           <% end %>
         </ul>
       </div>
-      <div class="flex flex-col flex-grow overflow-auto">
-        <.message :for={message <- @messages} message={message} />
+      <div class="flex flex-col flex-grow overflow-auto" id="room-messages" phx-update="stream">
+        <.message :for={{dom_id, message} <- @streams.messages} dom_id={dom_id} message={message} />
       </div>
       <div class="h-12 bg-white px-4 pb-4">
         <.form
@@ -135,10 +135,11 @@ defmodule SlaxWeb.ChatRoomLive do
   end
 
   attr :message, Message, required: true
+  attr :dom_id, :string, required: true
 
   def message(assigns) do
     ~H"""
-    <div class="relative flex px-4 py-3">
+    <div class="relative flex px-4 py-3" id={@dom_id}>
       <div class="size-10 rounded flex-shrink-0 bg-slate-300"></div>
       <div class="ml-2">
         <div class="-mt-1">
@@ -180,10 +181,10 @@ defmodule SlaxWeb.ChatRoomLive do
      socket
      |> assign(
        hide_topic?: false,
-       messages: messages,
        room: room,
        page_title: "#" <> room.name
      )
+     |> stream(:messages, messages, reset: true)
      |> assign_message_form(Chat.change_message(%Message{}))}
   end
 
@@ -199,7 +200,7 @@ defmodule SlaxWeb.ChatRoomLive do
       case Chat.create_message(room, message_params, current_user) do
         {:ok, message} ->
           socket
-          |> update(:messages, &(&1 ++ [message]))
+          |> stream_insert(:messages, message)
           |> assign_message_form(Chat.change_message(%Message{}))
 
         {:error, changeset} ->
