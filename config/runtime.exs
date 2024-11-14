@@ -20,6 +20,10 @@ if System.get_env("PHX_SERVER") do
   config :slax, SlaxWeb.Endpoint, server: true
 end
 
+config :slax, Slax.Mailer,
+  adapter: Resend.Swoosh.Adapter,
+  api_key: System.get_env("RESEND_KEY") || "re_fVKi7toj_JA3Jwy6t3wGKw8yuATPB6a53"
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||
