@@ -216,7 +216,19 @@ defmodule SlaxWeb.ChatRoomLive do
     </div>
     <.modal id="new-room-modal">
       <.header>New chat room</.header>
-      (form goes here)
+      <.simple_form
+        for={@new_room_form}
+        id="room-form"
+        phx-change="validate-room"
+        phx-submit="save-room"
+      >
+        <.input field={@new_room_form[:name]} type="text" label="Name" phx-debounce />
+        <.input field={@new_room_form[:topic]} type="text" label="Topic" phx-debounce />
+
+        <:actions>
+          <.button phx-disable-with="Saving..." class="w-full">Save</.button>
+        </:actions>
+      </.simple_form>
     </.modal>
     """
   end
@@ -244,6 +256,16 @@ defmodule SlaxWeb.ChatRoomLive do
   @impl true
   def handle_event("validate-message", %{"message" => message_params}, socket) do
     ChatRoomEventHandlers.handle_validate_message(message_params, socket)
+  end
+
+  @impl true
+  def handle_event("validate-room", %{"room" => room_params}, socket) do
+    ChatRoomEventHandlers.handle_validate_room(room_params, socket)
+  end
+
+  @impl true
+  def handle_event("save-room", %{"room" => room_params}, socket) do
+    ChatRoomEventHandlers.handle_save_room(room_params, socket)
   end
 
   @impl true
