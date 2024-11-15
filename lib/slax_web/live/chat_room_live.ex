@@ -1,9 +1,9 @@
 defmodule SlaxWeb.ChatRoomLive do
   use SlaxWeb, :live_view
-  alias Slax.Chat
-  alias Slax.Chat.{Room, Message}
-  alias Slax.Accounts.User
-  alias Slax.Accounts
+
+  import SlaxWeb.ChatComponents
+
+  alias SlaxWeb.ChatRoomEventHandlers
   alias SlaxWeb.OnlineUsers
 
   @impl true
@@ -18,7 +18,7 @@ defmodule SlaxWeb.ChatRoomLive do
 
       <div class="mt-4 overflow-auto">
         <div class="flex items-center h-8 px-3 group">
-          <.toggler on_click={toggle_rooms()} dom_id="rooms-toggler" text="Rooms" />
+          <.toggler dom_id="rooms-toggler" on_click={toggle_rooms()} text="Rooms" />
         </div>
 
         <div id="rooms-list">
@@ -208,302 +208,54 @@ defmodule SlaxWeb.ChatRoomLive do
     """
   end
 
-  attr :dom_id, :string, required: true
-  attr :text, :string, required: true
-  attr :on_click, JS, required: true
-
-  defp toggler(assigns) do
-    ~H"""
-    <button id={@dom_id} phx-click={@on_click} class="flex items-center flex-grow focus:outline-none">
-      <.icon id={@dom_id <> "-chevron-down"} name="hero-chevron-down" class="h-4 w-4" />
-      <.icon
-        id={@dom_id <> "-chevron-right"}
-        name="hero-chevron-right"
-        class="h-4 w-4"
-        style="display:none;"
-      />
-      <span class="ml-2 leading-none font-medium text-sm">
-        <%= @text %>
-      </span>
-    </button>
-    """
-  end
-
-  attr :user, User, required: true
-  attr :online, :boolean, default: false
-
-  def user(assigns) do
-    ~H"""
-    <.link class="flex items-center h-8 hover:bg-gray-300 text-sm pl-8 pr-3" href="#">
-      <div class="flex justify-center w-4">
-        <%= if @online do %>
-          <span class="size-2 rounded-full bg-blue-500"></span>
-        <% else %>
-          <span class="size-2 rounded-full border-2 border-gray-500"></span>
-        <% end %>
-      </div>
-      <span class="ml-2 leading-none"><%= username(@user) %></span>
-    </.link>
-    """
-  end
-
-  attr :active, :boolean, required: true
-  attr :room, Room, required: true
-  attr :unread_count, :integer, required: true
-
-  defp room_link(assigns) do
-    ~H"""
-    <.link
-      class={[
-        "flex items-center h-8 text-sm pl-8 pr-3",
-        (@active && "bg-slate-300") || "hover:bg-slate-300"
-      ]}
-      patch={~p"/rooms/#{@room}"}
-    >
-      <.icon name="hero-hashtag" class="size-4" />
-      <span class={["ml-2 leading-none", @active && "font-bold"]}>
-        <%= @room.name %>
-      </span>
-      <.unread_message_counter count={@unread_count} />
-    </.link>
-    """
-  end
-
-  attr :message, Message, required: true
-  attr :dom_id, :string, required: true
-  attr :timezone, :string, required: true
-  attr :current_user, User, required: true
-
-  def message(assigns) do
-    ~H"""
-    <div class="group relative flex px-4 py-3" id={@dom_id}>
-      <button
-        :if={@current_user.id == @message.user_id}
-        data-confirm="Are you sure?"
-        phx-click="delete-message"
-        phx-value-id={@message.id}
-        class="absolute top-4 right-4 text-red-500 hover:text-red-800 cursor-pointer hidden group-hover:block"
-      >
-        <.icon name="hero-trash" class="size-4" />
-      </button>
-
-      <img class="size-10 rounded flex-shrink-0" src={~p"/images/one_ring.jpg"} />
-
-      <div class="ml-2">
-        <div class="-mt-1">
-          <.link class="text-sm font-semibold hover:underline">
-            <span><%= username(@message.user) %></span>
-          </.link>
-          <span :if={@timezone} class="ml-1 text-xs text-gray-500">
-            <%= message_timestmp(@message, @timezone) %>
-          </span>
-          <p class="text-sm"><%= @message.body %></p>
-        </div>
-      </div>
-    </div>
-    """
-  end
-
-  attr :counter, :integer, required: true
-
-  defp unread_message_counter(assigns) do
-    ~H"""
-    <span
-      :if={@count > 0}
-      class="flex items-center justify-center bg-blue-500 rounded-full font-medium h-5 px-2 ml-auto text-xs text-white"
-    >
-      <%= @count %>
-    </span>
-    """
-  end
-
-  defp message_timestmp(message, timezone) do
-    message.inserted_at
-    |> Timex.Timezone.convert(timezone)
-    |> Timex.format!("%-l:%M %p", :strftime)
-  end
-
-  defp username(user) do
-    user.email |> String.split("@") |> List.first() |> String.capitalize()
-  end
-
   @impl true
   def mount(_params, _session, socket) do
-    rooms = Chat.list_joined_rooms_with_unread_counts(socket.assigns.current_user)
-    users = Accounts.list_users()
-    timezone = get_connect_params(socket)["timezone"]
-
-    if connected?(socket) do
-      OnlineUsers.track(self(), socket.assigns.current_user)
-    end
-
-    OnlineUsers.subscribe()
-
-    Enum.each(rooms, fn {chat, _} -> Chat.subscribe_to_room(chat) end)
-
-    socket =
-      socket
-      |> assign(rooms: rooms, timezone: timezone, users: users)
-      |> assign(online_users: OnlineUsers.list())
-      |> stream_configure(:messages,
-        dom_id: fn
-          %Message{id: id} -> "messages-#{id}"
-          :unread_marker -> "messages-unread-marker"
-        end
-      )
-
-    {:ok, socket}
+    ChatRoomEventHandlers.handle_mount(socket)
   end
 
   @impl true
   def handle_params(params, _url, socket) do
-    room =
-      case Map.fetch(params, "id") do
-        {:ok, id} ->
-          Chat.get_room!(id)
-
-        :error ->
-          Chat.get_first_room!()
-      end
-
-    last_read_id = Chat.get_last_read_id(room, socket.assigns.current_user)
-
-    messages =
-      room
-      |> Chat.list_messages_in_room()
-      |> maybe_insert_unread_marker(last_read_id)
-
-    Chat.update_last_read_id(room, socket.assigns.current_user)
-
-    {:noreply,
-     socket
-     |> assign(
-       hide_topic?: false,
-       joined?: Chat.joined?(room, socket.assigns.current_user),
-       room: room,
-       page_title: "#" <> room.name
-     )
-     |> stream(:messages, messages, reset: true)
-     |> assign_message_form(Chat.change_message(%Message{}))
-     |> push_event("scroll_messages_to_bottom", %{})
-     |> update(:rooms, fn rooms ->
-       room_id = room.id
-
-       Enum.map(rooms, fn
-         {%Room{id: ^room_id} = room, _} -> {room, 0}
-         other -> other
-       end)
-     end)}
-  end
-
-  defp maybe_insert_unread_marker(messages, nil), do: messages
-
-  defp maybe_insert_unread_marker(messages, last_read_id) do
-    {read, unread} = Enum.split_while(messages, &(&1.id <= last_read_id))
-
-    if unread == [] do
-      read
-    else
-      read ++ [:unread_marker | unread]
-    end
-  end
-
-  defp assign_message_form(socket, changeset) do
-    assign(socket, :new_message_form, to_form(changeset))
+    ChatRoomEventHandlers.handle_initial_params(params, socket)
   end
 
   @impl true
   def handle_event("submit-message", %{"message" => message_params}, socket) do
-    %{current_user: current_user, room: room} = socket.assigns
-
-    socket =
-      if Chat.joined?(room, current_user) do
-        case Chat.create_message(room, message_params, current_user) do
-          {:ok, _message} ->
-            assign_message_form(socket, Chat.change_message(%Message{}))
-
-          {:error, changeset} ->
-            assign_message_form(socket, changeset)
-        end
-      else
-        socket
-      end
-
-    {:noreply, socket}
+    ChatRoomEventHandlers.handle_submit_message(message_params, socket)
   end
 
   @impl true
   def handle_event("toggle-topic", _unsigned_params, socket) do
-    {:noreply, update(socket, :hide_topic?, &(!&1))}
+    ChatRoomEventHandlers.handle_toggle_topic(socket)
   end
 
   @impl true
   def handle_event("validate-message", %{"message" => message_params}, socket) do
-    changeset = Chat.change_message(%Message{}, message_params)
-
-    {:noreply, assign_message_form(socket, changeset)}
+    ChatRoomEventHandlers.handle_validate_message(message_params, socket)
   end
 
   @impl true
   def handle_event("delete-message", %{"id" => id}, socket) do
-    Chat.delete_message_by_id(id, socket.assigns.current_user)
-    {:noreply, socket}
+    ChatRoomEventHandlers.handle_delete_message(id, socket)
   end
 
   @impl true
   def handle_event("join-room", _, socket) do
-    current_user = socket.assigns.current_user
-
-    Chat.join_room!(socket.assigns.room, current_user)
-    Chat.subscribe_to_room(socket.assigns.room)
-
-    socket =
-      assign(socket,
-        joined?: true,
-        rooms: Chat.list_joined_rooms_with_unread_counts(current_user)
-      )
-
-    {:noreply, socket}
+    ChatRoomEventHandlers.handle_join_room(socket)
   end
 
   @impl true
   def handle_info({:new_message, message}, socket) do
-    room = socket.assigns.room
-
-    socket =
-      cond do
-        message.room_id == room.id ->
-          Chat.update_last_read_id(room, socket.assigns.current_user)
-
-          socket
-          |> stream_insert(:messages, message)
-          |> push_event("scroll_messages_to_bottom", %{})
-
-        message.user_id != socket.assigns.current_user.id ->
-          update(socket, :rooms, fn rooms ->
-            Enum.map(rooms, fn
-              {%Room{id: id} = room, count} when id == message.room_id -> {room, count + 1}
-              other -> other
-            end)
-          end)
-
-        true ->
-          socket
-      end
-
-    {:noreply, socket}
+    ChatRoomEventHandlers.handle_new_message(message, socket)
   end
 
   @impl true
   def handle_info({:message_deleted, message}, socket) do
-    {:noreply, stream_delete(socket, :messages, message)}
+    ChatRoomEventHandlers.handle_delete_message(message.id, socket)
   end
 
   @impl true
   def handle_info(%{event: "presence_diff", payload: diff}, socket) do
-    online_users = OnlineUsers.update(socket.assigns.online_users, diff)
-
-    {:noreply, assign(socket, :online_users, online_users)}
+    ChatRoomEventHandlers.handle_presence_diff(diff, socket)
   end
 
   defp toggle_rooms() do
@@ -516,5 +268,9 @@ defmodule SlaxWeb.ChatRoomLive do
     JS.toggle(to: "#users-toggler-chevron-down")
     |> JS.toggle(to: "#users-toggler-chevron-right")
     |> JS.toggle(to: "#users-list")
+  end
+
+  def username(user) do
+    user.email |> String.split("@") |> List.first() |> String.capitalize()
   end
 end
