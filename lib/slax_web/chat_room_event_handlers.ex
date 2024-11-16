@@ -22,6 +22,7 @@ defmodule SlaxWeb.ChatRoomEventHandlers do
     socket
     |> assign(rooms: rooms, timezone: timezone, users: users)
     |> assign(online_users: OnlineUsers.list())
+    |> assign(show_mobile_sidebar?: false)
     |> assign_room_form(Chat.change_room(%Room{}))
     |> stream_configure(:messages,
       dom_id: fn
