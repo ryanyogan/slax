@@ -98,7 +98,7 @@ defmodule SlaxWeb.ChatRoomLive do
         <ul class="relative z-10 flex items-center gap-4 px-4 sm:px-6 lg:px-8 justify-end">
           <%= if @current_user do %>
             <li class="text-[0.8125rem] leading-6 text-zinc-900">
-              <%= username(@current_user) %>
+              <%= @current_user.username %>
             </li>
             <li>
               <.link
@@ -296,9 +296,5 @@ defmodule SlaxWeb.ChatRoomLive do
     JS.toggle(to: "#users-toggler-chevron-down")
     |> JS.toggle(to: "#users-toggler-chevron-right")
     |> JS.toggle(to: "#users-list")
-  end
-
-  def username(user) do
-    user.email |> String.split("@") |> List.first() |> String.capitalize()
   end
 end

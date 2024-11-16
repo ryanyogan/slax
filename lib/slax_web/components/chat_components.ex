@@ -43,7 +43,7 @@ defmodule SlaxWeb.ChatComponents do
       <div class="ml-2">
         <div class="-mt-1">
           <.link class="text-sm font-semibold hover:underline">
-            <span><%= username(@message.user) %></span>
+            <span><%= @message.user.username %></span>
           </.link>
           <span :if={@timezone} class="ml-1 text-xs text-gray-500">
             <%= message_timestmp(@message, @timezone) %>
@@ -103,7 +103,7 @@ defmodule SlaxWeb.ChatComponents do
           <span class="size-2 rounded-full border-2 border-gray-500"></span>
         <% end %>
       </div>
-      <span class="ml-2 leading-none"><%= username(@user) %></span>
+      <span class="ml-2 leading-none"><%= @user.username %></span>
     </.link>
     """
   end
@@ -133,9 +133,5 @@ defmodule SlaxWeb.ChatComponents do
     message.inserted_at
     |> Timex.Timezone.convert(timezone)
     |> Timex.format!("%-l:%M %p", :strftime)
-  end
-
-  defp username(user) do
-    user.email |> String.split("@") |> List.first() |> String.capitalize()
   end
 end
