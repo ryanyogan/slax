@@ -31,7 +31,7 @@ defmodule SlaxWeb.ChatRoomLive do
           <button class="group relative flex items-center h-8 text-sm pl-8 pr-3 hover:bg-slate-300 cursor-pointer w-full">
             <.icon name="hero-plus" class="size-4 relative top-px" />
             <span class="ml-2 leading-none">Add rooms</span>
-            <div class="hidden group-focus:block cursor-default absolute top-8 right-2 bg-white border-slate-200 border py-3 rounded-lg">
+            <div class="hidden group-hover:block cursor-default absolute top-8 right-2 bg-white border-slate-200 border py-3 rounded-lg">
               <div class="w-full text-left">
                 <div class="hover:bg-sky-600">
                   <div
