@@ -123,6 +123,7 @@ defmodule Slax.Chat do
   def delete_message_by_id(id, %User{id: user_id}) do
     message = %Message{user_id: ^user_id} = Repo.get(Message, id)
     Repo.delete(message)
+
     Phoenix.PubSub.broadcast!(@pubsub, topic(message.room_id), {:message_deleted, message})
   end
 
